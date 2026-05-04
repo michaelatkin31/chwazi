@@ -79,6 +79,100 @@
       transition: opacity 0.3s;
     }
     #hint.hidden { opacity: 0; }
+
+    /* Invisible tap-target in the far top-right. 4 quick taps reveal the
+       cheater control panel. Sits above the canvas so taps don't add a
+       finger to the picker. */
+    #cheat-zone {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 80px;
+      height: 80px;
+      z-index: 20;
+      touch-action: manipulation;
+    }
+
+    #cheat-panel {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 100;
+      opacity: 1;
+      transition: opacity 0.18s ease;
+    }
+    #cheat-panel.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .cheat-card {
+      width: 340px;
+      max-width: 100%;
+      background: #141414;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 18px;
+      padding: 22px 20px 18px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    }
+    .cheat-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .cheat-subtitle {
+      font-size: 12px;
+      color: rgba(255,255,255,0.55);
+      margin-top: -6px;
+      margin-bottom: 6px;
+    }
+    .cheat-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cheat-options button {
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+      color: #fff;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      touch-action: manipulation;
+    }
+    .cheat-options button.active {
+      background: rgba(255,255,255,0.14);
+      border-color: rgba(255,255,255,0.32);
+    }
+    .cheat-close {
+      appearance: none;
+      border: none;
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.85);
+      padding: 11px;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      touch-action: manipulation;
+    }
   </style>
 </head>
 <body>
@@ -89,6 +183,21 @@
     <button data-mode="teams">Teams</button>
   </div>
   <div id="hint">Place 2+ fingers to begin</div>
+  <div id="cheat-zone" aria-hidden="true"></div>
+  <div id="cheat-panel" class="hidden" aria-hidden="true">
+    <div class="cheat-card" role="dialog" aria-label="Cheater control panel">
+      <div class="cheat-title">Cheater control panel</div>
+      <div class="cheat-subtitle">Applies to One mode. Saved on this device.</div>
+      <div class="cheat-options">
+        <button data-cheat="random">Random (fair)</button>
+        <button data-cheat="first">First finger down wins</button>
+        <button data-cheat="last">Last finger down wins</button>
+        <button data-cheat="top">Topmost finger wins</button>
+        <button data-cheat="bottom">Bottommost finger wins</button>
+      </div>
+      <button class="cheat-close">Close</button>
+    </div>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>

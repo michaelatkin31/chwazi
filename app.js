@@ -27,9 +27,17 @@
   // Modes: 'one' (pick one winner), 'order' (rank all), 'teams' (split colors into 2 teams)
   let mode = 'one';
 
-  // Rigged: in 'one' mode, the earliest finger placed always wins.
-  // Flip to false to restore fair random selection.
-  const CHEAT_FIRST_FINGER_WINS = true;
+  // Cheat mode for "one" — controls how the winner is chosen.
+  // 'random' | 'first' | 'last' | 'top' | 'bottom'
+  // Persists in localStorage so the cheater's preference survives reloads.
+  const CHEAT_KEY = 'chwazi.cheatMode';
+  const VALID_CHEATS = ['random', 'first', 'last', 'top', 'bottom'];
+  let cheatMode = (() => {
+    try {
+      const saved = localStorage.getItem(CHEAT_KEY);
+      return VALID_CHEATS.includes(saved) ? saved : 'first';
+    } catch { return 'first'; }
+  })();
 
   // State
   // touches: identifier -> { x, y, color, joinedAt, rank?, team? }
@@ -48,6 +56,20 @@
   // Frozen snapshot of touches at pick time. Rendering in 'picked' phase reads
   // from this so the result persists even after every finger is lifted.
   let snapshot = null;
+
+  function pickWinnerId(ids) {
+    const get = (id) => touches.get(id);
+    const minBy = (key) => ids.reduce((best, id) => get(id)[key] < get(best)[key] ? id : best);
+    const maxBy = (key) => ids.reduce((best, id) => get(id)[key] > get(best)[key] ? id : best);
+    switch (cheatMode) {
+      case 'first':  return minBy('joinedAt');
+      case 'last':   return maxBy('joinedAt');
+      case 'top':    return minBy('initialY');
+      case 'bottom': return maxBy('initialY');
+      case 'random':
+      default:       return ids[Math.floor(Math.random() * ids.length)];
+    }
+  }
 
   function pickColor() {
     const available = COLORS.filter((c) => !usedColors.has(c));
@@ -91,15 +113,7 @@
     const ids = [...touches.keys()];
 
     if (mode === 'one') {
-      let winnerId;
-      if (CHEAT_FIRST_FINGER_WINS) {
-        // Earliest joinedAt = first finger down
-        winnerId = ids.reduce((best, id) =>
-          touches.get(id).joinedAt < touches.get(best).joinedAt ? id : best
-        );
-      } else {
-        winnerId = ids[Math.floor(Math.random() * ids.length)];
-      }
+      const winnerId = pickWinnerId(ids);
       for (const id of ids) {
         touches.get(id).isWinner = id === winnerId;
       }
@@ -144,9 +158,13 @@
   function addTouches(list) {
     for (const t of list) {
       if (touches.has(t.identifier)) continue;
+      const x = t.clientX * dpr;
+      const y = t.clientY * dpr;
       touches.set(t.identifier, {
-        x: t.clientX * dpr,
-        y: t.clientY * dpr,
+        x, y,
+        // Frozen at touchstart — used by 'top'/'bottom' cheats so dragging
+        // a finger up/down after placing it doesn't change the outcome.
+        initialX: x, initialY: y,
         color: pickColor(),
         joinedAt: performance.now(),
       });
@@ -230,6 +248,76 @@
     }
     resetAll();
   });
+
+  // ---- Cheater control panel -----------------------------------------------
+  const cheatZone = document.getElementById('cheat-zone');
+  const cheatPanel = document.getElementById('cheat-panel');
+  const cheatButtons = cheatPanel.querySelectorAll('[data-cheat]');
+  const cheatCloseBtn = cheatPanel.querySelector('.cheat-close');
+
+  // 4 corner taps each within 800ms of the previous opens the panel.
+  const TAP_GAP_MS = 800;
+  const REQUIRED_TAPS = 4;
+  let cornerTapTimes = [];
+
+  function recordCornerTap() {
+    const now = performance.now();
+    const last = cornerTapTimes[cornerTapTimes.length - 1];
+    if (last !== undefined && now - last >= TAP_GAP_MS) {
+      cornerTapTimes = [];
+    }
+    cornerTapTimes.push(now);
+    if (cornerTapTimes.length >= REQUIRED_TAPS) {
+      cornerTapTimes = [];
+      openCheatPanel();
+    }
+  }
+
+  // Use touchstart on iOS, mousedown elsewhere. Avoid 'click' so we don't
+  // wait for the 300ms tap-delay heuristic.
+  cheatZone.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    recordCornerTap();
+  }, { passive: false });
+  cheatZone.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    recordCornerTap();
+  });
+
+  function refreshCheatActive() {
+    for (const b of cheatButtons) {
+      b.classList.toggle('active', b.dataset.cheat === cheatMode);
+    }
+  }
+
+  function setCheatMode(m) {
+    if (!VALID_CHEATS.includes(m)) return;
+    cheatMode = m;
+    try { localStorage.setItem(CHEAT_KEY, m); } catch {}
+    refreshCheatActive();
+  }
+
+  function openCheatPanel() {
+    refreshCheatActive();
+    cheatPanel.classList.remove('hidden');
+    cheatPanel.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeCheatPanel() {
+    cheatPanel.classList.add('hidden');
+    cheatPanel.setAttribute('aria-hidden', 'true');
+  }
+
+  for (const b of cheatButtons) {
+    b.addEventListener('click', () => setCheatMode(b.dataset.cheat));
+  }
+  cheatCloseBtn.addEventListener('click', closeCheatPanel);
+  cheatPanel.addEventListener('click', (e) => {
+    if (e.target === cheatPanel) closeCheatPanel(); // backdrop
+  });
+
+  refreshCheatActive();
 
   // Prevent iOS bounce, double-tap zoom, gestures on body
   document.addEventListener('gesturestart', (e) => e.preventDefault());
