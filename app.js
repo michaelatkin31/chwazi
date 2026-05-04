@@ -50,10 +50,14 @@
   let snapshot = null;
 
   function pickColor() {
-    for (const c of COLORS) {
-      if (!usedColors.has(c)) { usedColors.add(c); return c; }
+    const available = COLORS.filter((c) => !usedColors.has(c));
+    if (available.length > 0) {
+      const c = available[Math.floor(Math.random() * available.length)];
+      usedColors.add(c);
+      return c;
     }
-    return COLORS[touches.size % COLORS.length];
+    // All colors already in use — fall back to any random one.
+    return COLORS[Math.floor(Math.random() * COLORS.length)];
   }
 
   function releaseColor(c) { usedColors.delete(c); }
