@@ -111,8 +111,10 @@
       });
     }
 
-    // Freeze a copy for persistent display
-    snapshot = [...touches.values()].map((t) => ({ ...t }));
+    // Freeze a copy for persistent display. We keep the touch id so we can
+    // sync x/y from live touches each frame — fingers still on screen track
+    // their movement; lifted fingers retain their last-known position.
+    snapshot = [...touches.entries()].map(([id, t]) => ({ id, ...t }));
 
     if (navigator.vibrate) {
       try { navigator.vibrate(mode === 'order' ? [80, 60, 80, 60, 120] : 220); } catch {}
@@ -335,6 +337,16 @@
     // -- Picked phase -- (renders from `snapshot`, not live touches)
     const sincePick = now - phaseStartedAt;
     const items = snapshot || [];
+
+    // Sync live positions: fingers still on screen drag their visuals along;
+    // lifted fingers keep their last-seen position.
+    for (const item of items) {
+      const live = touches.get(item.id);
+      if (live) {
+        item.x = live.x;
+        item.y = live.y;
+      }
+    }
 
     if (mode === 'one') {
       const winner = items.find((t) => t.isWinner);
